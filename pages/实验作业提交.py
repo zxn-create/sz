@@ -18,7 +18,54 @@ from scipy.signal import convolve2d
 import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
+import base64
+import matplotlib
+import matplotlib.font_manager as fm
+import matplotlib.pyplot as plt
+from pathlib import Path
+import tempfile
+import os
 
+def setup_chinese_font_base64():
+    """使用Base64编码的字体数据"""
+    # 创建一个简单的黑体字体数据（这里只是示例，实际需要完整的字体文件）
+    # 在实际使用中，你需要有一个真正的字体文件
+    
+    # 方法A：使用系统自带的字体文件
+    try:
+        # 查找系统中可能的中文字体
+        font_files = fm.findSystemFonts()
+        chinese_fonts = []
+        
+        for font_file in font_files:
+            font_name = Path(font_file).stem.lower()
+            if any(keyword in font_name for keyword in ['simhei', 'simsun', 'microsoft', 'yahei', 'kai', 'fang']):
+                chinese_fonts.append(font_file)
+        
+        if chinese_fonts:
+            # 添加字体
+            for font_file in chinese_fonts[:1]:  # 只添加第一个找到的字体
+                fm.fontManager.addfont(font_file)
+                font_name = fm.FontProperties(fname=font_file).get_name()
+                matplotlib.rcParams['font.sans-serif'] = [font_name]
+                matplotlib.rcParams['axes.unicode_minus'] = False
+                return font_name
+    except:
+        pass
+    
+    # 方法B：使用matplotlib内置的字体
+    try:
+        # 尝试DejaVu Sans，它支持一些Unicode字符
+        matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans']
+        matplotlib.rcParams['axes.unicode_minus'] = False
+        return 'DejaVu Sans'
+    except:
+        pass
+    
+    return None
+
+# 调用设置
+font_name = setup_chinese_font_base64()
 st.set_page_config(
     page_title="作业提交台",
     page_icon="🔬",

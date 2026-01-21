@@ -1,0 +1,209 @@
+tabs = st.tabs(tab_names)
+# 全局图像上传器
+uploaded_file = None
+if 'current_image' not in st.session_state:
+    st.session_state.current_image = None
+
+def load_and_display_image(uploaded_file, tab_key):
+    """通用函数：加载并显示图像"""
+    if uploaded_file is not None:
+        try:
+            # 读取图像文件
+            image_bytes = uploaded_file.read()
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            
+            # 使用OpenCV读取图像
+            image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if image is None:
+                st.error("无法读取图像文件，请确保是有效的图像格式")
+                return None
+            
+            # 保存到session state
+            st.session_state[f'image_{tab_key}'] = image
+            
+            # 转换为RGB用于显示（Streamlit使用RGB）
+            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            return image, image_rgb
+            
+        except Exception as e:
+            st.error(f"加载图像时出错: {str(e)}")
+            return None
+    return None
+with tabs[0]:
+    st.markdown("### 🔬 图像增强处理")
+    st.markdown("""
+    <div class='ideology-card'>
+        <h4>🎯 思政关联：精益求精的工匠精神</h4>
+        <p>
+        图像增强技术体现了<strong style='color: #dc2626;'>精益求精</strong>的工匠精神，
+        通过不断优化细节，追求更高质量的图像效果，这正体现了社会主义核心价值观中的<strong style='color: #dc2626;'>敬业</strong>精神。
+        在技术学习中，我们要发扬这种一丝不苟、追求卓越的精神品质。
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    col_upload1, col_upload2 = st.columns(2)
+    
+    uploaded_file = None
+    
+    with col_upload1:
+        uploaded_file = st.file_uploader(
+            "📤 上传图像文件", 
+            type=["jpg", "jpeg", "png", "bmp", "webp"], 
+            key="tab1_upload"
+        )
+    
+    with col_upload2:
+        example_files = get_example_images()
+        if example_files:
+            selected_example = st.selectbox(
+                "📚 从素材库选择",
+                ["-- 请选择素材 --"] + example_files,
+                key="tab1_example"
+            )
+            
+            if selected_example != "-- 请选择素材 --":
+                uploaded_file = load_example_image(selected_example)
+                st.success(f"✅ 已选择素材: {selected_example}")
+        else:
+            st.info("📁 素材库为空，请添加图片到examples文件夹")
+    
+    if uploaded_file is not None:
+        # 读取图像
+        pil_image = Image.open(uploaded_file)
+        # 保存RGB版本用于显示
+        image_rgb = np.array(pil_image)
+        # 转换为BGR用于OpenCV处理
+        image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
+        
+        # 初始化结果变量
+        result_rgb = None
+        
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.markdown('<div class="image-container">', unsafe_allow_html=True)
+            # 显示RGB版本（正确的颜色）
+            st.image(image_rgb, caption="原始图像", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # 增强方法选择
+        enhancement_method = st.selectbox(
+            "选择增强方法",
+            ["直方图均衡化", "对比度调整", "伽马校正", "CLAHE增强"]
+        )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if enhancement_method == "对比度调整":
+                alpha = st.slider("对比度系数", 0.5, 3.0, 1.2, 0.1)
+                beta = st.slider("亮度调整", -50, 50, 0)
+                if st.button("应用对比度调整", use_container_width=True):
+                    # 使用BGR版本进行处理
+                    result_bgr = apply_contrast_adjustment(image_bgr, alpha, beta)
+                    # 转换为RGB用于显示
+                    result_rgb = cv2.cvtColor(result_bgr, cv2.COLOR_BGR2RGB)
+                    
+            elif enhancement_method == "伽马校正":
+                gamma = st.slider("伽马值", 0.1, 3.0, 1.0, 0.1)
+                if st.button("应用伽马校正", use_container_width=True):
+                    # 使用BGR版本进行处理
+                    result_bgr = apply_gamma_correction(image_bgr, gamma)
+                    # 转换为RGB用于显示
+                    result_rgb = cv2.cvtColor(result_bgr, cv2.COLOR_BGR2RGB)
+                    
+            elif enhancement_method == "CLAHE增强":
+                clip_limit = st.slider("对比度限制", 1.0, 4.0, 2.0, 0.1)
+                tile_size = st.slider("网格大小", 4, 16, 8, 2)
+                if st.button("应用CLAHE增强", use_container_width=True):
+                    # 使用BGR版本进行处理
+                    result_bgr = apply_clahe(image_bgr, clip_limit, (tile_size, tile_size))
+                    # 转换为RGB用于显示
+                    result_rgb = cv2.cvtColor(result_bgr, cv2.COLOR_BGR2RGB)
+                    
+            else:  # 直方图均衡化
+                if st.button("应用直方图均衡化", use_container_width=True):
+                    # 使用BGR版本进行处理
+                    result_bgr = apply_histogram_equalization(image_bgr)
+                    # 转换为RGB用于显示
+                    result_rgb = cv2.cvtColor(result_bgr, cv2.COLOR_BGR2RGB)
+        
+        with col2:
+            if result_rgb is not None:
+                st.markdown('<div class="image-container">', unsafe_allow_html=True)
+                st.image(result_rgb, caption=f"{enhancement_method}结果", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                # 显示对比和直方图
+                display_comparison_with_histograms(
+                    image_rgb, 
+                    result_rgb, 
+                    original_title="原始图像", 
+                    processed_title=f"{enhancement_method}结果"
+                )
+                
+                # 下载时使用RGB版本
+                provide_download_button(
+                    result_rgb, 
+                    f"enhanced_{enhancement_method}.jpg", 
+                    "📥 下载增强结果",
+                    unique_key_suffix="tab1_enhance"
+                )
+    else:
+        st.info("📤 请上传图像文件或从素材库选择图片开始处理")
+# 2. 边缘检测选项卡
+with tabs[1]:
+    st.markdown("### 📐 边缘检测算法比较")
+    
+    st.markdown("""
+    <div class='ideology-card'>
+        <h4>🎯 思政关联：严谨的科学态度</h4>
+        <p>
+        边缘检测算法体现了<strong style='color: #dc2626;'>严谨求实</strong>的科学态度，
+        不同算法各有优劣，需要根据实际需求选择，这体现了<strong style='color: #dc2626;'>实事求是</strong>的科学精神。
+        在技术研究中，我们要保持严谨的态度，追求真理。
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # ===== 双列布局：左侧上传，右侧素材库 =====
+    col_upload1, col_upload2 = st.columns(2)
+    
+    uploaded_file = None
+    
+    with col_upload1:
+        uploaded_file = st.file_uploader(
+            "📤 上传图像文件", 
+            type=["jpg", "jpeg", "png", "bmp", "webp"], 
+            key="tab2_upload"
+        )
+    
+    with col_upload2:
+        # 素材库选择
+        example_files = get_example_images()
+        
+        if example_files:
+            selected_example = st.selectbox(
+                "📚 从素材库选择",
+                ["-- 请选择素材 --"] + example_files,
+                key="tab2_example"
+            )
+            
+            if selected_example != "-- 请选择素材 --":
+                uploaded_file = load_example_image(selected_example)
+                st.success(f"✅ 已选择素材: {selected_example}")
+        else:
+            st.info("📁 素材库为空，请添加图片到examples文件夹")
+    
+    if uploaded_file is not None:
+        # 读取图像
+        pil_image = Image.open(uploaded_file)
+        # 保存RGB版本用于显示
+        image_rgb = np.array(pil_image)
+        # 转换为BGR用于OpenCV处理
+        image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
+        
+        # 初始化结果变量
+        canny_result_rgb = None
+        sobel_result_rgb = None
+        laplacian_result_rgb = None
